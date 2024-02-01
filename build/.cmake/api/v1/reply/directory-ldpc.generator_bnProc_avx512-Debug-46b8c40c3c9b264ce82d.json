@@ -1,0 +1,14 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : [],
+		"files" : [],
+		"nodes" : []
+	},
+	"installers" : [],
+	"paths" : 
+	{
+		"build" : "ldpc/generator_bnProc_avx512",
+		"source" : "openair1/PHY/CODING/nrLDPC_decoder/nrLDPC_tools/generator_bnProc_avx512"
+	}
+}

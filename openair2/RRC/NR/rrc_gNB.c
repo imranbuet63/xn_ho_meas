@@ -101,6 +101,7 @@
 #include "BIT_STRING.h"
 #include "assertions.h"
 
+#include "NR_MeasurementReport-IEs.h"
 //#define XER_PRINT
 
 extern RAN_CONTEXT_t RC;
@@ -576,7 +577,7 @@ static void rrc_gNB_generate_defaultRRCReconfiguration(const protocol_ctxt_t *co
   int scs = get_ssb_scs(cell_info);
   int band = get_dl_band(cell_info);
   uint32_t ssb_arfcn = get_ssb_arfcn(cell_info, du->mib, du->sib1);
-  NR_MeasConfig_t *measconfig = get_defaultMeasConfig(ssb_arfcn, band, scs);
+  NR_MeasConfig_t *measconfig = get_defaultMeasConfig(ssb_arfcn, band, scs, ctxt_pP->module_id );
 
   uint8_t buffer[RRC_BUF_SIZE] = {0};
   int size = do_RRCReconfiguration(ue_p,
@@ -1353,6 +1354,9 @@ static inline uint64_t bitStr_to_uint64(const BIT_STRING_t *asn) {
 
 static void rrc_gNB_process_MeasurementReport(rrc_gNB_ue_context_t *ue_context, NR_MeasurementReport_t *measurementReport)
 {
+  LOG_I(NR_RRC, "Process measurementReport Enter\n");
+  int neighbour_cells_count = -1;
+
   if (LOG_DEBUGFLAG(DEBUG_ASN1))
     xer_fprint(stdout, &asn_DEF_NR_MeasurementReport, (void *)measurementReport);
 
@@ -1369,6 +1373,160 @@ static void rrc_gNB_process_MeasurementReport(rrc_gNB_ue_context_t *ue_context, 
   /* we "keep" the measurement report, so set to 0 */
   free(measurementReport->criticalExtensions.choice.measurementReport);
   measurementReport->criticalExtensions.choice.measurementReport = NULL;
+
+  /*Imran*/
+  NR_MeasurementReport_IEs_t	*measurementReport_IEs = measurementReport->criticalExtensions.choice.measurementReport;
+  NR_MeasResults_t *ik_measResults = &measurementReport_IEs->measResults;
+
+  NR_MeasConfig_t *meas_config = ue_ctxt->measConfig;
+  if (meas_config == NULL) {
+    LOG_W(NR_RRC, "%s: %i - meas_config = %p\n", __FUNCTION__, __LINE__, meas_config);
+    return;
+  }
+
+  NR_MeasIdToAddMod_t *meas_id_s = NULL;
+  for (int meas_idx = 0; meas_idx < meas_config->measIdToAddModList->list.count; meas_idx++) {
+    if (id == meas_config->measIdToAddModList->list.array[meas_idx]->measId) {
+      meas_id_s = meas_config->measIdToAddModList->list.array[meas_idx];
+      break;
+    }
+  }
+  // gNB_RRC_UE_t *ue_ctxt = &ue_context->ue_context;
+
+  // AssertFatal(id, "unexpected MeasResult for MeasurementId %ld received\n", id);
+  // asn1cCallocOne(ue_ctxt->measResults, measurementReport->criticalExtensions.choice.measurementReport->measResults);
+  struct NR_ReportConfigToAddMod__reportConfig *report_config = NULL;
+  for (int report_id = 0; report_id < meas_config->reportConfigToAddModList->list.count; report_id++) {
+    if (meas_id_s->reportConfigId == meas_config->reportConfigToAddModList->list.array[report_id]->reportConfigId) {
+      report_config = &meas_config->reportConfigToAddModList->list.array[report_id]->reportConfig;
+    }
+  }
+
+  NR_EventTriggerConfig_t *event_triggered = report_config->choice.reportConfigNR->reportType.choice.eventTriggered;
+  bool trigger_ho = false;
+
+  switch (event_triggered->eventId.present) {
+    case NR_EventTriggerConfig__eventId_PR_eventA1:
+      LOG_I(NR_RRC, "Event A1 (Serving becomes better than threshold)\n");
+      break;
+
+    case NR_EventTriggerConfig__eventId_PR_eventA2:
+      LOG_I(NR_RRC, "Event A2 (Serving becomes worse than threshold)\n");
+      break;
+
+    case NR_EventTriggerConfig__eventId_PR_eventA3:
+
+      LOG_I(NR_RRC, "Event A3 (Neighbour becomes offset better than SpCell)\n");
+
+      /*Event A3*/
+      /*ServingCell*/
+     
+
+      /*iterate over all the Cells*/
+      for (int res_mo_idx = 0 ; res_mo_idx < ik_measResults->measResultServingMOList.list.count; res_mo_idx++){
+
+        /*Primary Cells*/
+
+        NR_MeasResultServMO_t *measresultservmo_all = ik_measResults->measResultServingMOList.list.array[res_mo_idx];
+        NR_MeasQuantityResults_t *mqr_all = NULL;
+
+        if (measresultservmo_all->measResultServingCell.measResult.cellResults.resultsSSB_Cell){
+          mqr_all = measresultservmo_all->measResultServingCell.measResult.cellResults.resultsSSB_Cell;
+        }
+        else {
+          mqr_all = measresultservmo_all->measResultServingCell.measResult.cellResults.resultsCSI_RS_Cell;
+        }
+        AssertFatal(mqr_all, "No Serving Cell Measrements!\n");
+
+        const long active_rsrp = *mqr_all->rsrp -157;
+        const long active_rsrq = *mqr_all->rsrq -157;
+        LOG_D(NR_RRC, "Serving Cell Measurements: RSRP: %ld dBm, RSRQ: %ld dB,  MeasurementID: %ld\n", active_rsrp, active_rsrq, id);
+
+        /*Best Neighbour Cell*/
+
+        NR_MeasQuantityResults_t *neighbour_mqr_all = NULL;
+
+        if (measresultservmo_all->measResultServingCell.measResult.cellResults.resultsSSB_Cell){
+          neighbour_mqr_all = measresultservmo_all->measResultBestNeighCell->measResult.cellResults.resultsSSB_Cell;
+        }
+        else {
+          neighbour_mqr_all = measresultservmo_all->measResultBestNeighCell->measResult.cellResults.resultsCSI_RS_Cell;
+        }
+        AssertFatal(neighbour_mqr_all, "No Serving Cell Measrements!\n");
+
+        const long neighbour_rsrp = *neighbour_mqr_all->rsrp - 157;
+        const long neighbour_rsrq = *neighbour_mqr_all->rsrq - 157;
+        LOG_D(RRC, "Best Neighbour Cell Measurements: RSRP: %ld dBm, RSRQ: %ld dB, MeasurementID: %ld\n", neighbour_rsrp, neighbour_rsrq, id);
+
+        /*Offset for now considering 0*/
+        long rsrp_offset = event_triggered->eventId.choice.eventA3->a3_Offset.choice.rsrp;
+
+        if (neighbour_rsrp > active_rsrp){
+          trigger_ho = true;
+          LOG_D(RRC, "A3 EVENT SATISFIED\n");
+        /*HO Initiation*/  
+        }
+      }
+    case NR_EventTriggerConfig__eventId_PR_eventA4:
+      LOG_I(NR_RRC, "Event A4 (Neighbour becomes better than threshold)\n");
+      break;
+
+    case NR_EventTriggerConfig__eventId_PR_eventA5:
+      LOG_I(NR_RRC, "Event A5 (SpCell becomes worse than threshold1 and neighbour becomes better than threshold2)\n");
+      break;
+
+    case NR_EventTriggerConfig__eventId_PR_eventA6:
+      LOG_I(NR_RRC, "Event A6 (Neighbour becomes offset better than SCell)\n");
+      break;
+
+    default:
+      LOG_I(NR_RRC, "NR_EventTriggerConfig__eventId_PR_NOTHING or Other event report\n");
+      break;
+
+  }
+
+  if (trigger_ho == true) {
+    LOG_I(NR_RRC, "Handover is triggered\n");
+  }
+
+  NR_MeasResultServMO_t *measresultservmo = ik_measResults->measResultServingMOList.list.array[0]; //getting only first
+  NR_MeasResultNR_t *measresultnr = &measresultservmo->measResultServingCell;
+  NR_MeasQuantityResults_t *mqr = measresultnr->measResult.cellResults.resultsSSB_Cell;
+
+   if (mqr != NULL){
+    const long rrsrp = *mqr->rsrp - 156;
+    const float rrsrq = (float) (*mqr->rsrq - 87) / 2.0f;
+    const float rsinr = (float) (*mqr->sinr - 46) / 2.0f;
+    LOG_D(RRC, "RSRP %ld dBm RSRQ %.1f dB SINR %.1f dB\n", rrsrp, rrsrq, rsinr);
+  }
+
+  LOG_D(RRC, "NR MeasID %ld\n", id);
+
+  /*ALL NeighbourCell*/
+  // NR_MeasResultNR_t *neighbour_measresult = ik_measResults->measResultNeighCells->choice.measResultListNR.list.array[0] ;
+  
+  NR_MeasResultNR_t *neighbour_measresult = ik_measResults->measResultNeighCells->choice.measResultListNR->list.array[0] ;
+
+  // NR_MeasQuantityResults_t *neighbour = neighbour_measresult->measResult.cellResults.resultsSSB_Cell;
+
+
+  // if (measurementReport->criticalExtensions.choice.measurementReport->measResults->measResultNeighCells->choice.measResultListNR.list.count > 0) {
+
+  //   neighbour_cells_count = measurementReport->criticalExtensions.choice.measurementReport->measResults->measResultNeighCells->choice.measResultListNR.list.count
+  //   LOG_D(RRC, "Neighbour Cells Count %d\n", neighbour_cells_count );
+
+  // }
+
+  // if (neighbour != NULL){
+  //   const long rrsrp = *neighbour->rsrp - 156;
+  //   const float rrsrq = (float) (*neighbour->rsrq - 87) / 2.0f;
+  //   const float rsinr = (float) (*neighbour->sinr - 46) / 2.0f;
+  //   LOG_D(RRC, "PrimaryCell Results: %d NeighbouringCell Results: %d", rrsrp, rrsrq, rsinr);
+  // }
+
+
+
+  /*Imran*/
 }
 
 static int handle_rrcReestablishmentComplete(const protocol_ctxt_t *const ctxt_pP,
