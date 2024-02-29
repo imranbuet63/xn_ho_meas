@@ -1355,7 +1355,7 @@ static inline uint64_t bitStr_to_uint64(const BIT_STRING_t *asn) {
 static void rrc_gNB_process_MeasurementReport(rrc_gNB_ue_context_t *ue_context, NR_MeasurementReport_t *measurementReport)
 {
   LOG_I(NR_RRC, "Process measurementReport Enter\n");
-  int neighbour_cells_count = -1;
+  // int neighbour_cells_count = -1;
 
   if (LOG_DEBUGFLAG(DEBUG_ASN1))
     xer_fprint(stdout, &asn_DEF_NR_MeasurementReport, (void *)measurementReport);
@@ -1459,7 +1459,7 @@ static void rrc_gNB_process_MeasurementReport(rrc_gNB_ue_context_t *ue_context, 
         LOG_D(RRC, "Best Neighbour Cell Measurements: RSRP: %ld dBm, RSRQ: %ld dB, MeasurementID: %ld\n", neighbour_rsrp, neighbour_rsrq, id);
 
         /*Offset for now considering 0*/
-        long rsrp_offset = event_triggered->eventId.choice.eventA3->a3_Offset.choice.rsrp;
+        // long rsrp_offset = event_triggered->eventId.choice.eventA3->a3_Offset.choice.rsrp;
 
         if (neighbour_rsrp > active_rsrp){
           trigger_ho = true;
@@ -1505,7 +1505,7 @@ static void rrc_gNB_process_MeasurementReport(rrc_gNB_ue_context_t *ue_context, 
   /*ALL NeighbourCell*/
   // NR_MeasResultNR_t *neighbour_measresult = ik_measResults->measResultNeighCells->choice.measResultListNR.list.array[0] ;
   
-  NR_MeasResultNR_t *neighbour_measresult = ik_measResults->measResultNeighCells->choice.measResultListNR->list.array[0] ;
+  // NR_MeasResultNR_t *neighbour_measresult = ik_measResults->measResultNeighCells->choice.measResultListNR->list.array[0] ;
 
   // NR_MeasQuantityResults_t *neighbour = neighbour_measresult->measResult.cellResults.resultsSSB_Cell;
 
