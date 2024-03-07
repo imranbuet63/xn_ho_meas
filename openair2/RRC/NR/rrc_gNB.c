@@ -578,7 +578,7 @@ static void rrc_gNB_generate_defaultRRCReconfiguration(const protocol_ctxt_t *co
   int band = get_dl_band(cell_info);
   uint32_t ssb_arfcn = get_ssb_arfcn(cell_info, du->mib, du->sib1);
   NR_MeasConfig_t *measconfig = get_defaultMeasConfig(ssb_arfcn, band, scs, ctxt_pP->module_id );
-
+  ue_p->measConfig = measconfig; //nocommentout
   uint8_t buffer[RRC_BUF_SIZE] = {0};
   int size = do_RRCReconfiguration(ue_p,
                                    buffer,
