@@ -1363,31 +1363,37 @@ static void rrc_gNB_process_MeasurementReport(rrc_gNB_ue_context_t *ue_context, 
   DevAssert(measurementReport->criticalExtensions.present == NR_MeasurementReport__criticalExtensions_PR_measurementReport
             && measurementReport->criticalExtensions.choice.measurementReport != NULL);
 
-  gNB_RRC_UE_t *ue_ctxt = &ue_context->ue_context;
-  ASN_STRUCT_FREE(asn_DEF_NR_MeasResults, ue_ctxt->measResults);
-  ue_ctxt->measResults = NULL;
+  gNB_RRC_UE_t *ue_ctxt = &ue_context->ue_context; //check
+  // ASN_STRUCT_FREE(asn_DEF_NR_MeasResults, ue_ctxt->measResults);
+  // ue_ctxt->measResults = NULL;
 
-  const NR_MeasId_t id = measurementReport->criticalExtensions.choice.measurementReport->measResults.measId;
-  AssertFatal(id, "unexpected MeasResult for MeasurementId %ld received\n", id);
-  asn1cCallocOne(ue_ctxt->measResults, measurementReport->criticalExtensions.choice.measurementReport->measResults);
+  const NR_MeasId_t id = measurementReport->criticalExtensions.choice.measurementReport->measResults.measId; //check
+  AssertFatal(id, "unexpected MeasResult for MeasurementId %ld received\n", id); //check
+  asn1cCallocOne(ue_ctxt->measResults, measurementReport->criticalExtensions.choice.measurementReport->measResults); //check
   /* we "keep" the measurement report, so set to 0 */
-  free(measurementReport->criticalExtensions.choice.measurementReport);
-  measurementReport->criticalExtensions.choice.measurementReport = NULL;
+  // free(measurementReport->criticalExtensions.choice.measurementReport);
+  // measurementReport->criticalExtensions.choice.measurementReport = NULL;
 
   /*Imran*/
-  NR_MeasurementReport_IEs_t	*measurementReport_IEs = measurementReport->criticalExtensions.choice.measurementReport;
+  NR_MeasurementReport_IEs_t  *measurementReport_IEs = measurementReport->criticalExtensions.choice.measurementReport; //check
   NR_MeasResults_t *ik_measResults = &measurementReport_IEs->measResults;
 
-  NR_MeasConfig_t *meas_config = ue_ctxt->measConfig;
+  NR_MeasConfig_t *meas_config = ue_ctxt->measConfig; //check
   if (meas_config == NULL) {
     LOG_W(NR_RRC, "%s: %i - meas_config = %p\n", __FUNCTION__, __LINE__, meas_config);
     return;
   }
 
-  NR_MeasIdToAddMod_t *meas_id_s = NULL;
+  if (ue_ctxt->measResults != NULL) {
+    free(ue_ctxt->measResults);
+  }
+  // ue_ctxt->measResults = NULL;
+  ue_ctxt->measResults = ik_measResults;
+
+  NR_MeasIdToAddMod_t *meas_ids = NULL;
   for (int meas_idx = 0; meas_idx < meas_config->measIdToAddModList->list.count; meas_idx++) {
     if (id == meas_config->measIdToAddModList->list.array[meas_idx]->measId) {
-      meas_id_s = meas_config->measIdToAddModList->list.array[meas_idx];
+      meas_ids = meas_config->measIdToAddModList->list.array[meas_idx];
       break;
     }
   }
@@ -1397,7 +1403,7 @@ static void rrc_gNB_process_MeasurementReport(rrc_gNB_ue_context_t *ue_context, 
   // asn1cCallocOne(ue_ctxt->measResults, measurementReport->criticalExtensions.choice.measurementReport->measResults);
   struct NR_ReportConfigToAddMod__reportConfig *report_config = NULL;
   for (int report_id = 0; report_id < meas_config->reportConfigToAddModList->list.count; report_id++) {
-    if (meas_id_s->reportConfigId == meas_config->reportConfigToAddModList->list.array[report_id]->reportConfigId) {
+    if (meas_ids->reportConfigId == meas_config->reportConfigToAddModList->list.array[report_id]->reportConfigId) {
       report_config = &meas_config->reportConfigToAddModList->list.array[report_id]->reportConfig;
     }
   }
@@ -1467,6 +1473,8 @@ static void rrc_gNB_process_MeasurementReport(rrc_gNB_ue_context_t *ue_context, 
         /*HO Initiation*/  
         }
       }
+      break;
+
     case NR_EventTriggerConfig__eventId_PR_eventA4:
       LOG_I(NR_RRC, "Event A4 (Neighbour becomes better than threshold)\n");
       break;
@@ -1489,18 +1497,18 @@ static void rrc_gNB_process_MeasurementReport(rrc_gNB_ue_context_t *ue_context, 
     LOG_I(NR_RRC, "Handover is triggered\n");
   }
 
-  NR_MeasResultServMO_t *measresultservmo = ik_measResults->measResultServingMOList.list.array[0]; //getting only first
-  NR_MeasResultNR_t *measresultnr = &measresultservmo->measResultServingCell;
-  NR_MeasQuantityResults_t *mqr = measresultnr->measResult.cellResults.resultsSSB_Cell;
+  // NR_MeasResultServMO_t *measresultservmo = ik_measResults->measResultServingMOList.list.array[0]; //getting only first
+  // NR_MeasResultNR_t *measresultnr = &measresultservmo->measResultServingCell;
+  // NR_MeasQuantityResults_t *mqr = measresultnr->measResult.cellResults.resultsSSB_Cell;
 
-   if (mqr != NULL){
-    const long rrsrp = *mqr->rsrp - 156;
-    const float rrsrq = (float) (*mqr->rsrq - 87) / 2.0f;
-    const float rsinr = (float) (*mqr->sinr - 46) / 2.0f;
-    LOG_D(RRC, "RSRP %ld dBm RSRQ %.1f dB SINR %.1f dB\n", rrsrp, rrsrq, rsinr);
-  }
+  //  if (mqr != NULL){
+  //   const long rrsrp = *mqr->rsrp - 156;
+  //   const float rrsrq = (float) (*mqr->rsrq - 87) / 2.0f;
+  //   const float rsinr = (float) (*mqr->sinr - 46) / 2.0f;
+  //   LOG_D(RRC, "RSRP %ld dBm RSRQ %.1f dB SINR %.1f dB\n", rrsrp, rrsrq, rsinr);
+  // }
 
-  LOG_D(RRC, "NR MeasID %ld\n", id);
+  // LOG_D(RRC, "NR MeasID %ld\n", id);
 
   /*ALL NeighbourCell*/
   // NR_MeasResultNR_t *neighbour_measresult = ik_measResults->measResultNeighCells->choice.measResultListNR.list.array[0] ;
