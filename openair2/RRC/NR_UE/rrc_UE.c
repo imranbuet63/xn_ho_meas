@@ -49,6 +49,8 @@
 #include "rrc_defs.h"
 #include "rrc_proto.h"
 #include "LAYER2/NR_MAC_UE/mac_proto.h"
+#include "LAYER2/NR_MAC_UE/mac_proto.h"
+#include "COMMON/mac_rrc_primitives.h"
 
 #include "intertask_interface.h"
 
@@ -72,7 +74,8 @@
 
 #include "nr_nas_msg_sim.h"
 
-static NR_UE_RRC_INST_t *NR_UE_rrc_inst;
+
+NR_UE_RRC_INST_t *NR_UE_rrc_inst;
 /* NAS Attach request with IMSI */
 static const char nr_nas_attach_req_imsi_dummy_NSA_case[] = {
     0x07,
@@ -877,6 +880,22 @@ static void rrc_ue_generate_RRCSetupComplete(instance_t instance, rnti_t rnti, c
   nr_pdcp_data_req_srb(rnti, srb_id, 0, size, buffer, deliver_pdu_srb_rlc, NULL);
 }
 
+// static void rrc_ue_generate_measurementReport(const protocol_ctxt_t *ctxt_pP, const uint8_t gNB_index)
+// {
+//   uint8_t buffer[100];
+
+//   if (NR_UE_rrc_inst[ctxt_pP->module_id].measurementReport == NULL) {
+//     NR_UE_rrc_inst[ctxt_pP->module_id].measurementReport = calloc(1, sizeof(struct NR_MeasurementReport));
+//   }
+
+//   uint8_t size = do_nrMeasurementReport_SA(NR_UE_rrc_inst[ctxt_pP->module_id].measurementReport,
+//                                            &NR_UE_rrc_inst[ctxt_pP->module_id].l3_measurements,
+//                                            buffer,
+//                                            sizeof(buffer));
+
+//   nr_pdcp_data_req_srb(ctxt_pP->rntiMaybeUEid, DCCH, nr_rrc_mui++, size, buffer, deliver_pdu_srb_rlc, NULL);
+// }
+
 static int8_t nr_rrc_ue_decode_ccch(const instance_t instance,
                                     const rnti_t rnti,
                                     const NRRrcMacCcchDataInd *ind,
@@ -1406,9 +1425,41 @@ void nr_rrc_handle_ra_indication(NR_UE_RRC_INST_t *rrc, bool ra_succeeded)
 
 void *rrc_nrue_task(void *args_p)
 {
+  MessageDef *msg_p;
+  instance_t instance;
+  unsigned int ue_mod_id;
+  int result;
+  NR_SRB_INFO *srb_info_p;
+  protocol_ctxt_t ctxt;
   itti_mark_task_ready(TASK_RRC_NRUE);
   while (1) {
+    itti_receive_msg (TASK_RRC_NRUE, &msg_p);
+    instance = ITTI_MSG_DESTINATION_INSTANCE (msg_p);
+    ue_mod_id = UE_INSTANCE_TO_MODULE_ID(instance);
+
+    switch (ITTI_MSG_ID(msg_p)) {
+      case NR_RRC_MAC_MEAS_DATA_IND:
+        rrc_ue_generate_measurementReport(&ctxt,
+                                             NR_RRC_MAC_MEAS_DATA_IND(msg_p).gnb_index,
+                                             NR_RRC_MAC_MEAS_DATA_IND(msg_p).rsrp);
+        //  LOG_I(NR_RRC, "[gNB %i, count %i] Received measurements: RSRP_s = %i (dBm)\n",
+        //        NR_RRC_MAC_MEAS_DATA_IND(msg_p).gnb_index,
+        //        number_of_received_meas,
+        //        NR_RRC_MAC_MEAS_DATA_IND(msg_p).rsrp-157);
+
+        //  // FIXME: Add a correct criterion
+        //  if (number_of_received_meas == 100) {
+        //    rrc_ue_generate_measurementReport(&ctxt,
+        //                                      NR_RRC_MAC_MEAS_DATA_IND(msg_p).gnb_index,
+        //                                      NR_RRC_MAC_MEAS_DATA_IND(msg_p).rsrp);
+        //    number_of_received_meas = 0;
+        //  }
+
+        //  number_of_received_meas++;
+
+         break;
     rrc_nrue(NULL);
+  }
   }
 }
 

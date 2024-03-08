@@ -61,6 +61,11 @@ typedef struct RB_INFO_NR_s {
   //MAC_MEAS_REQ_ENTRY *Meas_entry; //may not needed for NB-IoT
 } NR_RB_INFO;
 
+typedef struct NR_SRB_INFO_s {
+  NR_RRC_BUFFER Rx_buffer;
+  NR_RRC_BUFFER Tx_buffer;
+} NR_SRB_INFO;
+
 typedef struct SRB_INFO_TABLE_ENTRY_NR_s {
   uint8_t Active;
   uint8_t status;

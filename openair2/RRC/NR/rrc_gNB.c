@@ -1363,27 +1363,25 @@ static void rrc_gNB_process_MeasurementReport(rrc_gNB_ue_context_t *ue_context, 
   DevAssert(measurementReport->criticalExtensions.present == NR_MeasurementReport__criticalExtensions_PR_measurementReport
             && measurementReport->criticalExtensions.choice.measurementReport != NULL);
 
+  
+  /*Imran*/
+  NR_MeasurementReport_IEs_t  *measurementReport_IEs = measurementReport->criticalExtensions.choice.measurementReport; //check
+  const NR_MeasId_t id = measurementReport_IEs->measResults.measId; //check
   gNB_RRC_UE_t *ue_ctxt = &ue_context->ue_context; //check
-  // ASN_STRUCT_FREE(asn_DEF_NR_MeasResults, ue_ctxt->measResults);
-  // ue_ctxt->measResults = NULL;
 
-  const NR_MeasId_t id = measurementReport->criticalExtensions.choice.measurementReport->measResults.measId; //check
   AssertFatal(id, "unexpected MeasResult for MeasurementId %ld received\n", id); //check
-  asn1cCallocOne(ue_ctxt->measResults, measurementReport->criticalExtensions.choice.measurementReport->measResults); //check
+  asn1cCallocOne(ue_ctxt->measResults, measurementReport_IEs->measResults); //check
   /* we "keep" the measurement report, so set to 0 */
   // free(measurementReport->criticalExtensions.choice.measurementReport);
   // measurementReport->criticalExtensions.choice.measurementReport = NULL;
-
-  /*Imran*/
-  NR_MeasurementReport_IEs_t  *measurementReport_IEs = measurementReport->criticalExtensions.choice.measurementReport; //check
-  NR_MeasResults_t *ik_measResults = &measurementReport_IEs->measResults;
 
   NR_MeasConfig_t *meas_config = ue_ctxt->measConfig; //check
   if (meas_config == NULL) {
     LOG_W(NR_RRC, "%s: %i - meas_config = %p\n", __FUNCTION__, __LINE__, meas_config);
     return;
   }
-
+  
+  NR_MeasResults_t *ik_measResults = &measurementReport_IEs->measResults;
   if (ue_ctxt->measResults != NULL) {
     free(ue_ctxt->measResults);
   }
